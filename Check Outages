@@ -1,0 +1,43 @@
+name: Check DEDDIE Outages
+
+on:
+  schedule:
+    # Runs every 2 hours. Edit the cron expression to change frequency.
+    # (GitHub Actions cron is UTC; Greece is UTC+2/UTC+3 with DST.)
+    - cron: "0 */2 * * *"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run outage check
+        env:
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+        run: python outage_watch.py --debug
+
+      - name: Commit updated state file
+        run: |
+          git config user.name "outage-watch-bot"
+          git config user.email "actions@github.com"
+          git add seen_outages.json
+          git diff --quiet --cached || git commit -m "Update seen outages"
+          git push
